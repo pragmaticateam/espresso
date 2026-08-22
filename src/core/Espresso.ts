@@ -189,11 +189,19 @@ export class Espresso {
   }
 
   /** Start listening. Returns `this` so the app can be chained further. */
+  listen(callback?: () => void): this;
   listen(port?: number, callback?: () => void): this;
-  listen(port: number, hostname: string, callback?: () => void): this;
-  listen(port = 3000, hostnameOrCallback?: string | (() => void), maybeCallback?: () => void): this {
+  listen(port?: number, hostname?: string, callback?: () => void): this;
+  listen(
+    portOrCallback: number | (() => void) = 3000,
+    hostnameOrCallback?: string | (() => void),
+    maybeCallback?: () => void,
+  ): this {
+    const port = typeof portOrCallback === 'function' ? 3000 : portOrCallback;
+    const eagerCallback = typeof portOrCallback === 'function' ? portOrCallback : undefined;
     const hostname = typeof hostnameOrCallback === 'string' ? hostnameOrCallback : '0.0.0.0';
-    const callback = typeof hostnameOrCallback === 'function' ? hostnameOrCallback : maybeCallback;
+    const callback =
+      eagerCallback ?? (typeof hostnameOrCallback === 'function' ? hostnameOrCallback : maybeCallback);
     this.server = createServer((req, res) => {
       void this.handleConnection(req, res);
     });
