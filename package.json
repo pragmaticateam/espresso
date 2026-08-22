@@ -1,0 +1,59 @@
+{
+  "name": "espresso-mvc",
+  "version": "0.1.0",
+  "description": "espresso — lightweight TypeScript framework for building REST APIs and MVC apps on web-standard Request/Response",
+  "keywords": [
+    "framework",
+    "web",
+    "rest",
+    "api",
+    "mvc",
+    "http",
+    "router",
+    "templating",
+    "mongodb",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "pragmatica team",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mongo": {
+      "types": "./dist/mongo.d.ts",
+      "import": "./dist/mongo.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test",
+    "pretest": "npm run build",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "peerDependencies": {
+    "mongodb": "^7.5.0"
+  },
+  "peerDependenciesMeta": {
+    "mongodb": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2"
+  }
+}
