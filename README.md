@@ -1,16 +1,18 @@
 # espresso-mvc
 
-**espresso** is a lightweight TypeScript framework for building REST APIs and
-MVC applications on top of web-standard `Request`/`Response` objects.
+**espresso** is a lightweight TypeScript framework for building REST APIs and MVC
+applications on top of web-standard `Request` / `Response` objects.
 
-- Zero runtime dependencies, zero optional peers — install only what you use
-- Fully typed routes — params are inferred from path templates
-- Middleware with `next()`, global or scoped to a path prefix
-- Composable sub-apps via `.mount()` / `router()`
-- Built-in templating engine (`.espresso` templates) with partials, sections and caching
-- Static file serving with path-traversal protection
-- Beautiful zero-config request logger
-- MongoDB support available as a separate package: [`espresso-mongo`](./espresso-mongo)
+- **Zero runtime dependencies** — install only what you use
+- **Fully typed routes** — params are inferred from path templates
+- **Middleware with `next()`** — global or scoped to a path prefix
+- **Composable sub-apps** via `.mount()` / `router()`
+- **Built-in templating engine** (`.espresso` templates) with partials and caching
+- **Static file serving** with path-traversal protection
+- **Beautiful zero-config request logger**
+- Framework core is transport-free: `app.handle(request)` works on any
+  web-standard `Request`, so it runs on Node's http server today and ports
+  anywhere `Request`/`Response` do
 
 Requires Node.js >= 20.
 
@@ -20,10 +22,10 @@ Requires Node.js >= 20.
 npm install espresso-mvc
 ```
 
-MongoDB support lives in a separate package — see [`espresso-mongo`](./espresso-mongo):
+MongoDB support lives in a separate package so the core stays tiny:
 
 ```sh
-npm install espresso-mvc espresso-mongo mongodb
+npm install espresso-mongo mongodb
 ```
 
 ## Quick start
@@ -42,8 +44,21 @@ app
 app.listen(3000, () => console.log('http://localhost:3000'));
 ```
 
-Handlers can return plain objects (sent as JSON), strings, `Response`
-objects, or nothing at all — whatever you return is normalized for you.
+Handlers can return plain objects (sent as JSON), strings, `Uint8Array` /
+`ArrayBuffer`, a web `Response`, or nothing at all — whatever you return is
+normalized for you.
+
+### A runnable example
+
+The [`example/`](./example) folder contains a small café API + website using
+routes, mounted sub-apps, scoped auth middleware, cookies, views and static
+assets. Run it directly with Node's native TypeScript support (Node >= 23):
+
+```sh
+npm run build
+npm link && npm link espresso-mvc   # make 'espresso-mvc' importable
+node example/server.ts              # Node >= 23 for native TS stripping
+```
 
 ## The Context object
 
@@ -51,9 +66,12 @@ Every handler receives a `ctx`:
 
 | Member | Description |
 | --- | --- |
+| `ctx.request` | The original web-standard `Request` |
 | `ctx.params` | Route params, typed from the path (`/users/:id` → `{ id: string }`) |
-| `ctx.query` | `URLSearchParams` |
+| `ctx.query` | `URLSearchParams` of the query string |
 | `ctx.headers` | Request `Headers` |
+| `ctx.method` | Uppercase HTTP method |
+| `ctx.path` | URL pathname |
 | `ctx.cookies` | Parsed request cookies |
 | `ctx.body` | Lazily parsed body (JSON, form-urlencoded, multipart, or raw text) |
 | `ctx.set` | Mutable response state: `{ status, headers, cookies }` |
@@ -64,6 +82,7 @@ Every handler receives a `ctx`:
 | `ctx.view(name, data?)` | Render a template from the views directory |
 
 Cookies set via `ctx.set.cookies[key] = value` are appended automatically.
+Status and headers set via `ctx.set` apply even when you return a bare object.
 
 ## Routing
 
@@ -77,21 +96,7 @@ app.all('/health', handler);
 
 Catch-all segments: `/files/*` → `params['*']`.
 
-### Routers and mounting
-
-```ts
-import { router } from 'espresso-mvc';
-
-const api = router();
-api.get('/', listUsers).post('/', createUser);
-
-app.use(logger()).mount('/api/users', api);
-```
-
-`.use(app)` mounts without a prefix. Middlewares and static dirs of the
-sub-app come along automatically.
-
-### Middleware
+## Middleware
 
 ```ts
 // global
@@ -109,11 +114,31 @@ app.use('/admin', authMiddleware);
 app.use((ctx) => ctx.json({ blocked: true }, 401));
 ```
 
-### Error handling
+Middleware runs in registration order; route matching happens after the whole
+chain resolves.
+
+## Routers and mounting
+
+```ts
+import { router } from 'espresso-mvc';
+
+const api = router();
+api.get('/', listUsers).post('/', createUser);
+
+app.mount('/api/users', api);
+// or: app.use(api)
+```
+
+Routes, middleware (re-scoped to the prefix) and static directories of the
+sub-app come along automatically.
+
+## Error handling
 
 ```ts
 app.onError((error, ctx) => ctx.json({ message: 'oops' }, 500));
 ```
+
+Without a custom handler, thrown errors produce a JSON 500 response.
 
 ## Views & templating
 
@@ -138,17 +163,21 @@ app.public(); // serve src/public under /
 Template syntax:
 
 ```
-{{ title }}                     escaped interpolation (dot-paths work)
-{{{ html }}}                    raw interpolation
+{{ title }}                      escaped interpolation (dot-paths work)
+{{{ html }}}                     raw interpolation
 {{ #if user }} ... {{ else }} ... {{ /if }}
 {{ #each items }} {{ name }} {{ @index }} {{ /each }}
+{{ #items }} ... {{ /items }}    generic section — iterates arrays,
+                                 enters object scope otherwise
 {{ ^empty }} renders when falsy/empty {{ /empty }}
-{{ partial 'header' }}
-{{ partial 'user' currentUser }}
+{{ this }}                       current scope inside a section
+{{ partial 'header' }}           include from views/partials
+{{ partial 'user' currentUser }} include with an overridden context
 ```
 
-Templates are compiled once and cached; files are re-read only when their
-mtime changes. `.html` files work too.
+Lookups walk parent scopes, so variables from outer blocks stay visible inside
+sections. Templates are compiled once and cached; files are re-read only when
+their mtime changes. `.html` files work too.
 
 You can also use the engine directly:
 
@@ -159,17 +188,33 @@ const t = new Templating({ viewsDir: 'src/views' });
 const html = await t.render('<h1>{{ title }}</h1>', { title: 'Hello' });
 ```
 
+## Serving static files
+
+```ts
+app.static('/cdn', './storage'); // any directory under any prefix
+app.static('/img', './images');  // multiple dirs chain naturally:
+                                 // if one misses, the next is tried
+```
+
+Resolved paths are confined to their root directory (path traversal returns
+403), missing files return `null` so later statics or routes can take over,
+and MIME types for common extensions are built in.
+
 ## Logger
 
 ```ts
 import { logger } from 'espresso-mvc';
 
-app.use(logger());                       // [14:03:22] GET /users 200 ✓ OK 2 ms 120 B
+app.use(logger());
+// [14:03:22] GET     /api/users → 200 ✓ OK          2 ms   120 B
+// [14:03:25] DELETE  /api/users/1 → 204 ✓ No Content 1 ms    —
+// [14:03:55] POST    /boom → 500 ✗ Internal Server Error 12 ms
+
 app.use(logger({
-  timestamp: 'iso' | 'time' | 'none',
-  showQuery: boolean,
-  showSize: boolean,
-  colors: boolean,
+  timestamp: 'time' | 'iso' | 'none',   // default 'time'
+  showQuery: boolean,                   // default true
+  showSize: boolean,                    // default true
+  colors: boolean,                      // default: TTY && !NO_COLOR
   onLog: (entry) => metrics.push(entry), // sink hook for tests/dashboards
 }));
 ```
@@ -177,68 +222,49 @@ app.use(logger({
 Errors thrown by handlers are logged with status 500 and re-thrown to your
 error handler.
 
-## MongoDB (separate package)
+## Configuration
 
-MongoDB support is published as [`espresso-mongo`](./espresso-mongo) so this
-core package stays tiny and dependency-free — you only install a database
-driver when you actually need one:
-
-```sh
-npm install espresso-mongo mongodb
-```
+Everything has a sensible default:
 
 ```ts
-import {
-  connectMongo, disconnectMongo, isConnected,
-  model,
-} from 'espresso-mongo';
-
-const User = model('user', {
-  email: { type: 'string', required: true, unique: true },
-  age: { type: 'number', min: 0 },
-  tags: { type: 'array', default: [] },
-  active: { type: 'boolean', default: true },
+const app = new Espresso({
+  viewsDir: 'src/views',            // templates for ctx.view()
+  partialsDir: 'src/views/partials',// template partials
+  assetsDir: 'src/assets',          // served by .assets()
+  publicDir: 'src/public',          // served by .public()
 });
-
-await connectMongo({ uri: process.env.MONGODB_URI!, dbName: 'app' });
-await User.buildIndexes();
-
-const user = await User.create({ email: 'a@b.c' });       // validated + timestamps
-const found = await User.findById(id);
-const page = await User.paginate({}, { page: 1, limit: 20 });
-
-await disconnectMongo();
 ```
 
-Model API: `create`, `createMany`, `find`, `findOne`, `findById`, `exists`,
-`updateById`, `updateOne`, `deleteById`, `deleteOne`, `count`, `paginate`,
-`buildIndexes`. Documents get automatic `createdAt`/`updatedAt`; invalid
-writes throw `MongoModelError` with per-field errors.
+`.listen()` accepts `(port?, callback?)` or `(port, hostname, callback?)`;
+the port defaults to `3000`.
 
-Schema field options: `{ type, required?, unique?, default?, enum?, min?,
-max?, minLength?, maxLength?, match?, items?, hidden? }` where `type` is one
-of `'string' | 'number' | 'boolean' | 'date' | 'objectid' | 'object' | 'array'`.
+## Testing without a server
 
-See the [`espresso-mongo` README](./espresso-mongo/README.md) for details.
-
-## Serving static files safely
-
-`serveStaticFile()` confines resolved paths inside the root directory and
-returns `null` for missing files, so multiple static dirs can be chained:
+`app.handle(request)` is the entire request pipeline as a pure function — no
+socket required:
 
 ```ts
-import { serveStaticFile } from 'espresso-mvc';
-
-app.static('/cdn', './storage');
+const res = await app.handle(new Request('http://localhost/users/42'));
+assert.equal(res.status, 200);
+assert.deepEqual(await res.json(), { id: '42' });
 ```
 
-MIME types for common extensions are built in.
+This also makes the framework portable to any runtime that provides
+`Request`/`Response`.
 
 ## TypeScript-first
 
 Everything is typed: handlers receive fully-typed contexts, `Handler<Path>`
-infers params from route literals, and all public APIs ship declaration
-files.
+infers params from route literals via `ParamsFromPath`, and all public APIs
+ship declaration files.
+
+## Development
+
+```sh
+npm run build      # compile to dist/
+npm run typecheck  # tsc --noEmit
+npm test           # builds, then node --test
+```
 
 ## License
 
