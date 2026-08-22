@@ -15,6 +15,14 @@
   ],
   "license": "MIT",
   "author": "pragmatica team",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pragmaticateam/espresso.git"
+  },
+  "homepage": "https://github.com/pragmaticateam/espresso#readme",
+  "bugs": {
+    "url": "https://github.com/pragmaticateam/espresso/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=20"
