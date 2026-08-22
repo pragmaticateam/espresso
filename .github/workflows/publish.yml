@@ -33,7 +33,7 @@ jobs:
   publish:
     needs: test
     if: >-
-      github.repository_owner == 'salym' &&
+      github.repository_owner == 'pragmaticateam' &&
       (
         github.event_name == 'release' ||
         github.event_name == 'workflow_dispatch' ||
