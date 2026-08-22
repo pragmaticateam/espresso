@@ -64,6 +64,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify NPM_TOKEN secret is present
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::NPM_TOKEN secret is missing or empty. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish
         run: npm publish --provenance --access public
         env:
