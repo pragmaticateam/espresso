@@ -3,14 +3,14 @@
 **espresso** is a lightweight TypeScript framework for building REST APIs and
 MVC applications on top of web-standard `Request`/`Response` objects.
 
-- Zero runtime dependencies (MongoDB support is optional)
+- Zero runtime dependencies, zero optional peers — install only what you use
 - Fully typed routes — params are inferred from path templates
 - Middleware with `next()`, global or scoped to a path prefix
 - Composable sub-apps via `.mount()` / `router()`
 - Built-in templating engine (`.espresso` templates) with partials, sections and caching
 - Static file serving with path-traversal protection
 - Beautiful zero-config request logger
-- Optional MongoDB module: schema validation, typed models, timestamps, pagination
+- MongoDB support available as a separate package: [`espresso-mongo`](./espresso-mongo)
 
 Requires Node.js >= 20.
 
@@ -20,10 +20,10 @@ Requires Node.js >= 20.
 npm install espresso-mvc
 ```
 
-Optional MongoDB support:
+MongoDB support lives in a separate package — see [`espresso-mongo`](./espresso-mongo):
 
 ```sh
-npm install espresso-mvc mongodb
+npm install espresso-mvc espresso-mongo mongodb
 ```
 
 ## Quick start
@@ -177,16 +177,21 @@ app.use(logger({
 Errors thrown by handlers are logged with status 500 and re-thrown to your
 error handler.
 
-## MongoDB (optional)
+## MongoDB (separate package)
 
-Import from the `espresso-mvc/mongo` subpath so `mongodb` is only loaded when
-you actually use it:
+MongoDB support is published as [`espresso-mongo`](./espresso-mongo) so this
+core package stays tiny and dependency-free — you only install a database
+driver when you actually need one:
+
+```sh
+npm install espresso-mongo mongodb
+```
 
 ```ts
 import {
   connectMongo, disconnectMongo, isConnected,
   model,
-} from 'espresso-mvc/mongo';
+} from 'espresso-mongo';
 
 const User = model('user', {
   email: { type: 'string', required: true, unique: true },
@@ -213,6 +218,8 @@ writes throw `MongoModelError` with per-field errors.
 Schema field options: `{ type, required?, unique?, default?, enum?, min?,
 max?, minLength?, maxLength?, match?, items?, hidden? }` where `type` is one
 of `'string' | 'number' | 'boolean' | 'date' | 'objectid' | 'object' | 'array'`.
+
+See the [`espresso-mongo` README](./espresso-mongo/README.md) for details.
 
 ## Serving static files safely
 
