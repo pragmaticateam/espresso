@@ -1,0 +1,1 @@
+<b>{{ greeting }}, {{ name }} ({{ lang }})</b>

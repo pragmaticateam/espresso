@@ -109,6 +109,9 @@ function parseBlock(
     }
     if (tag.kind === 'else') {
       if (top) throw new Error('Unexpected {{ else }} outside of a section');
+      // Unreachable today: the frame returns immediately after handling an
+      // else, so a second `{{ else }}` lands in a fresh child frame.
+      /* node:coverage ignore next */
       if (elseNodes !== null) throw new Error('Duplicate {{ else }} in section');
       const rest = parseBlock(tokens, i + 1, closeName);
       return { nodes, elseNodes: rest.nodes, next: rest.next };
