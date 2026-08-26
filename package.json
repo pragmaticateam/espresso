@@ -1,6 +1,6 @@
 {
   "name": "espresso-mvc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "espresso — lightweight TypeScript framework for building REST APIs and MVC apps on web-standard Request/Response",
   "keywords": [
     "framework",
